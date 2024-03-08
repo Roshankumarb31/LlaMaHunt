@@ -8,36 +8,6 @@ from tqdm import tqdm
 
 
 
-tag_generator_path = "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
-
-# model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype="auto").cuda()
-
-tag_generator = AutoModelForCausalLM.from_pretrained(
-    tag_generator_path,
-    low_cpu_mem_usage=True,
-    device_map="auto"
-)
-
-tokenizer = AutoTokenizer.from_pretrained(tag_generator_path)
-
-tag_streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
-
-generation_params = {
-    "do_sample": True,
-    "temperature": 0.1,
-    "top_p": 0.95,
-    "top_k": 40,
-    "max_new_tokens": 2048,
-    "repetition_penalty": 1.1
-}
-
-tag_pipe = pipeline(
-    "text-generation",
-    model=tag_generator,
-    tokenizer=tokenizer,
-    # streamer=tag_streamer,
-    **generation_params
-)
 
 
 
@@ -87,7 +57,7 @@ def generate_tag(pipe,resume):
 
 
 
-    print("Generating response...")
+    # print("Generating response...")
     output = pipe(prompt)[0]["generated_text"]
 
     response_index = output.find("/INST]")
@@ -159,7 +129,7 @@ def get_linkedin(url):
     for card in job_cards:
         # Find the job details
         job_title = card.find("h3", class_="base-search-card__title").text.strip()
-        print(f"job_title: {job_title}")
+        # print(f"job_title: {job_title}")
         try:
             company_name = card.find("a", class_="hidden-nested-link").text.strip()
         except:
@@ -179,10 +149,10 @@ def get_linkedin(url):
 
         # Create a dictionary to store the data for this job
         job_details = {
-            "Job Title": job_title,
-            "Company Name": company_name,
-            "Location": location,
-            "Salary Info": salary_info,
+            "job_title": job_title,
+            "company_name": company_name,
+            "location": location,
+            "salary_info": salary_info,
             "Link":apply_link
         }
 
@@ -221,7 +191,7 @@ def create_search_querries(tags:str):
 
     internshala_keywords= internshala_keywords[:-1]
 
-    print(internshala_keywords)
+    # print(internshala_keywords)
 
     internshala_search_query = f"https://internshala.com/internships/{internshala_keywords}-internship"
 
@@ -276,49 +246,72 @@ def get_internshala(url):
 
     return all_internship_details
 
-with open("resume.txt","r") as file:
-    resume_content = file.read()
+
+def get_results(resume_content,preferences):
 
 
-preferences = "[Location: Chicago, Internships]"
+    tag_generator_path = "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
 
-# with open("jobs.txt","r") as file:
-#     jobs = file.read()
+    # model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype="auto").cuda()
 
-jobs = (create_search_querries(generate_tag(tag_pipe,resume_content)))
+    tag_generator = AutoModelForCausalLM.from_pretrained(
+        tag_generator_path,
+        low_cpu_mem_usage=True,
+        device_map="auto"
+    )
 
-with open('parsed_jobs.txt','w') as file:
-    file.write(str(jobs))
-    
+    tokenizer = AutoTokenizer.from_pretrained(tag_generator_path)
 
-# get_naukri('something')
+    tag_streamer = TextStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
 
-# get_glassdoor("somethitg")
+    generation_params = {
+        "do_sample": True,
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_new_tokens": 2048,
+        "repetition_penalty": 1.1
+    }
 
-with open("parsed_jobs.txt","w") as file:
-    file.write(str(jobs))
+    tag_pipe = pipeline(
+        "text-generation",
+        model=tag_generator,
+        tokenizer=tokenizer,
+        # streamer=tag_streamer,
+        **generation_params
+    )
 
-print(len(jobs))
-split_ratio = len(jobs)//6
 
-# job_splits = []
+    jobs = (create_search_querries(generate_tag(tag_pipe,resume_content)))
 
-# for i in range(0, len(jobs), split_ratio):
-#     job_splits.append(jobs[i:i+split_ratio])
+    with open('parsed_jobs.txt','w') as file:
+        file.write(str(jobs))
+        
 
-# print(len(job_splits))
+    # print(len(jobs))
+    # split_ratio = len(jobs)//6
 
-# validated = ""
+    # job_splits = []
 
-# for split in tqdm(job_splits):
+    # for i in range(0, len(jobs), split_ratio):
+    #     job_splits.append(jobs[i:i+split_ratio])
 
-#     validated += validate_jobs(pipe=tag_pipe,resume=resume_content,jobs_json=split,preferences=preferences)
+    # print(len(job_splits))
 
-# print(validated)
+    # validated = ""
 
-jobs_list = []
+    # for split in tqdm(job_splits):
 
-for i in jobs:
-    if len(i)>1:
-        for j in i:
-            jobs_list.append(j)
+    #     validated += validate_jobs(pipe=tag_pipe,resume=resume_content,jobs_json=split,preferences=preferences)
+
+    # print(validated)
+
+    jobs_list = []
+
+    for i in jobs:
+        if len(i)>1:
+            for j in i:
+                jobs_list.append(j)
+
+
+    return jobs_list
